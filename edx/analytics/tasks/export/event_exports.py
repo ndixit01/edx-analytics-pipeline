@@ -176,17 +176,22 @@ class EventExportTask(EventLogSelectionMixin, MultiOutputMapReduceJobTask):
             self.incr_counter('Event Export', 'Bytes Written to Output', num_bytes)
 
         key_file_targets = [get_target_from_url(url_path_join(self.gpg_key_dir, recipient)) for recipient in recipients]
-        with make_encrypted_file(output_file, key_file_targets, progress=report_progress) as encrypted_output_file:
-            outfile = gzip.GzipFile(mode='wb', fileobj=encrypted_output_file)
-            try:
-                for value in values:
-                    outfile.write(value.strip())
-                    outfile.write('\n')
-                    # WARNING: This line ensures that Hadoop knows that our process is not sitting in an infinite loop.
-                    # Do not remove it.
-                    self.incr_counter('Event Export', 'Raw Bytes Written', len(value) + 1)
-            finally:
-                outfile.close()
+        try:
+            with make_encrypted_file(output_file, key_file_targets, progress=report_progress) as encrypted_output_file:
+                outfile = gzip.GzipFile(mode='wb', fileobj=encrypted_output_file)
+                try:
+                    for value in values:
+                        outfile.write(value.strip())
+                        outfile.write('\n')
+                        # WARNING: This line ensures that Hadoop knows that our process is not sitting in an infinite
+                        # loop.  Do not remove it.
+                        self.incr_counter('Event Export', 'Raw Bytes Written', len(value) + 1)
+                finally:
+                    outfile.close()
+        except IOError as err:
+            log.error("Error encountered while encrypting and gzipping Organization: {} file: {} Exception: {}"
+                      .format(org_id, key_file_targets, err))
+            self.incr_counter("Event Export", "{} org with Errors".format(org_id), 1)
 
     def get_org_id(self, event):
         """

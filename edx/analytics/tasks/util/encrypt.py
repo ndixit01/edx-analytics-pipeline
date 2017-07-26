@@ -4,6 +4,7 @@ Tasks for performing encryption on export files.
 from contextlib import contextmanager
 import logging
 import tempfile
+import datetime
 
 import gnupg
 
@@ -75,17 +76,47 @@ def _import_key_files(gpg_instance, key_file_targets):
     """
     for key_file_target in key_file_targets:
         log.info("Importing keyfile from %s", key_file_target.path)
-        gpg_instance.import_keys(get_key_from_target(key_file_target))
+        import_result = gpg_instance.import_keys(get_key_from_target(key_file_target))
+
+        for key_fingerprint in import_result.fingerprints:
+            pub_keys = gpg_instance.list_keys()
+            for test_key in pub_keys:
+                if test_key["fingerprint"] == key_fingerprint:
+                    if len(test_key["expires"]) > 0:
+                        current_time = datetime.datetime.now()
+                        next_week = current_time + datetime.timedelta(days=7)
+                        key_expire = datetime.datetime.fromtimestamp(int(test_key["expires"]))
+                        # All of these messages will be buried in a container log and never see the light of day
+                        if current_time > key_expire:
+                            log.error("Error key with fingerprint: '{}' and recipient '{}' has expired!!!"
+                                      .format(key_fingerprint, test_key["uids"]))
+                        elif next_week > key_expire:
+                            log.info("Warning key with fingerprint: " +
+                                     "'{}' and recipient '{}' will expire in the next week"
+                                     .format(key_fingerprint, test_key["uids"]))
 
 
 def _encrypt_file(gpg_instance, input_file, encrypted_filepath, recipients):
     """Encrypts a given file open for read, and writes result to a file."""
     log.info('Generating encrypted file: %s', encrypted_filepath)
-    gpg_instance.encrypt_file(
+    encryption_result = gpg_instance.encrypt_file(
         input_file,
         recipients,
         always_trust=True,
         output=encrypted_filepath,
         armor=False,
     )
-    log.info('Encryption complete.')
+
+    if not encryption_result.ok:
+        log.error("Encrypted file completed: " + str(encryption_result.ok))
+        status = ""
+        stderr = ""
+        if hasattr(encryption_result, "status"):
+            status = str(encryption_result.status)
+            log.error("Encryption status: " + str(encryption_result.status))
+        if hasattr(encryption_result, "stderr"):
+            stderr = str(encryption_result.stderr)
+            log.error("Encryption error: " + str(encryption_result.stderr))
+        raise IOError("Error while encrypting.  Status: {}  StdErr: {}".format(status, stderr))
+
+    log.info('Encryption process complete.')
