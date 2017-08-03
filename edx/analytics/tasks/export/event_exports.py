@@ -162,6 +162,9 @@ class EventExportTask(EventLogSelectionMixin, MultiOutputMapReduceJobTask):
             )
         )
 
+    def event_export_counter(self, counter_title):
+        self.incr_counter("Event Export", counter_title, 1)
+
     def multi_output_reducer(self, key, values, output_file):
         """
         Write values to the appropriate file as determined by the key.
@@ -177,7 +180,8 @@ class EventExportTask(EventLogSelectionMixin, MultiOutputMapReduceJobTask):
 
         key_file_targets = [get_target_from_url(url_path_join(self.gpg_key_dir, recipient)) for recipient in recipients]
         try:
-            with make_encrypted_file(output_file, key_file_targets, progress=report_progress) as encrypted_output_file:
+            with make_encrypted_file(output_file, key_file_targets, progress=report_progress,
+                                     hadoop_counter_callback=self.event_export_counter) as encrypted_output_file:
                 outfile = gzip.GzipFile(mode='wb', fileobj=encrypted_output_file)
                 try:
                     for value in values:
@@ -189,8 +193,10 @@ class EventExportTask(EventLogSelectionMixin, MultiOutputMapReduceJobTask):
                 finally:
                     outfile.close()
         except IOError as err:
-            log.error("Error encountered while encrypting and gzipping Organization: {} file: {} Exception: {}"
-                      .format(org_id, key_file_targets, err))
+            log.error("Error encountered while encrypting and gzipping Organization: %s file: %s Exception: %s",
+                      org_id, key_file_targets, err)
+            # This counter is set when there is an error during the generation of the encryption file for an
+            # organization for any reason, including encryption errors related to an expired GPG key
             self.incr_counter("Event Export", "{} org with Errors".format(org_id), 1)
 
     def get_org_id(self, event):
