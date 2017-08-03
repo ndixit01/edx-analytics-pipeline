@@ -96,12 +96,14 @@ def _import_key_files(gpg_instance, key_file_targets, hadoop_counter_callback):
                             # generated when the key is used for encryption
                             log.error("Error key with fingerprint: '%s' and recipient '%s' has expired!!!",
                                       key_fingerprint, test_key["uids"])
-                            hadoop_counter_callback("GPG Key for {} has expired".format(test_key["uids"]))
+                            for recipient in test_key["uids"]:
+                                hadoop_counter_callback("GPG Key for {} has expired".format(recipient))
                         elif next_week > key_expire:
                             log.info("Warning key with fingerprint: " +
                                      "'%s' and recipient '%s' will expire in the next week",
                                      key_fingerprint, test_key["uids"])
-                            hadoop_counter_callback("GPG Key for {} is near expiry".format(test_key["uids"]))
+                            for recipient in test_key["uids"]:
+                                hadoop_counter_callback("GPG Key for {} is near expiry".format(recipient))
 
 
 def _encrypt_file(gpg_instance, input_file, encrypted_filepath, recipients):
