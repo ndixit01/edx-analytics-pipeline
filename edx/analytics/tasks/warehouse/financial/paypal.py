@@ -22,6 +22,7 @@ import requests
 from edx.analytics.tasks.util.hive import WarehouseMixin
 from edx.analytics.tasks.util.overwrite import OverwriteOutputMixin
 from edx.analytics.tasks.util.url import get_target_from_url, url_path_join
+from edx.analytics.tasks.common.pathutil import PathSelectionByDateIntervalTask
 
 log = logging.getLogger(__name__)
 
@@ -696,13 +697,23 @@ class PaypalTransactionsIntervalTask(PaypalTaskMixin, WarehouseMixin, luigi.Wrap
             self.interval = date_interval.Custom(self.interval_start, self.interval_end)
 
     def requires(self):
-        for day in self.interval:
-            yield PaypalTransactionsByDayTask(
-                account_id=self.account_id,
-                output_root=self.output_root,
-                date=day,
-                overwrite=self.overwrite,
-            )
+        run_date = self.interval_end - datetime.timedelta(days=1)
+        selection_interval = date_interval.Custom(self.interval_start, run_date)
+
+        yield PathSelectionByDateIntervalTask(
+            source=[url_path_join(self.warehouse_path, 'payments')],
+            interval=selection_interval,
+            pattern=['.*dt=(?P<date>\\d{4}-\\d{2}-\\d{2})/paypal\.tsv'],
+            expand_interval=datetime.timedelta(0),
+            date_pattern='%Y-%m-%d',
+        )
+
+        yield PaypalTransactionsByDayTask(
+            account_id=self.account_id,
+            output_root=self.output_root,
+            date=run_date,
+            overwrite=self.overwrite,
+        )
 
     def output(self):
         return [task.output() for task in self.requires()]

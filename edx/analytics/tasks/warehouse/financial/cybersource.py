@@ -12,6 +12,7 @@ from luigi import date_interval
 from edx.analytics.tasks.util.hive import HivePartition, WarehouseMixin
 from edx.analytics.tasks.util.overwrite import OverwriteOutputMixin
 from edx.analytics.tasks.util.url import get_target_from_url, url_path_join
+from edx.analytics.tasks.common.pathutil import PathSelectionByDateIntervalTask
 
 log = logging.getLogger(__name__)
 
@@ -221,9 +222,19 @@ class IntervalPullFromCybersourceTask(PullFromCybersourceTaskMixin, WarehouseMix
             'overwrite': self.overwrite,
         }
 
-        for run_date in self.interval:
-            args['run_date'] = run_date
-            yield DailyProcessFromCybersourceTask(**args)
+        run_date = self.interval_end - datetime.timedelta(days=1)
+        selection_interval = date_interval.Custom(self.interval_start, run_date)
+
+        yield PathSelectionByDateIntervalTask(
+            source=[url_path_join(self.warehouse_path, 'payments')],
+            interval=selection_interval,
+            pattern=['.*dt=(?P<date>\\d{4}-\\d{2}-\\d{2})/cybersource_{}\.tsv'.format(self.merchant_id)],
+            expand_interval=datetime.timedelta(0),
+            date_pattern='%Y-%m-%d',
+        )
+
+        args['run_date'] = run_date
+        yield DailyProcessFromCybersourceTask(**args)
 
     def output(self):
         return [task.output() for task in self.requires()]
