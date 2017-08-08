@@ -195,5 +195,9 @@
     - name: boto configured
       copy: src=boto.cfg dest={{ working_repo_dir }}/.boto mode=644
 
+    - name: boto configured for environment
+      copy: src=boto.cfg dest=/etc/boto.cfg
+      sudo: yes
+
     - name: show working directory
       debug: var=working_repo_dir
