@@ -228,7 +228,7 @@ class IntervalPullFromCybersourceTask(PullFromCybersourceTaskMixin, WarehouseMix
         yield PathSelectionByDateIntervalTask(
             source=[url_path_join(self.warehouse_path, 'payments')],
             interval=selection_interval,
-            pattern=['.*dt=(?P<date>\\d{{4}}-\\d{{2}}-\\d{{2}})/cybersource_{}\.tsv'.format(self.merchant_id)],
+            pattern=['.*dt=(?P<date>\\d{{4}}-\\d{{2}}-\\d{{2}})/cybersource_{}\\.tsv'.format(self.merchant_id)],
             expand_interval=datetime.timedelta(0),
             date_pattern='%Y-%m-%d',
         )

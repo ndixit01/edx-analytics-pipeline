@@ -703,7 +703,7 @@ class PaypalTransactionsIntervalTask(PaypalTaskMixin, WarehouseMixin, luigi.Wrap
         yield PathSelectionByDateIntervalTask(
             source=[url_path_join(self.warehouse_path, 'payments')],
             interval=selection_interval,
-            pattern=['.*dt=(?P<date>\\d{4}-\\d{2}-\\d{2})/paypal\.tsv'],
+            pattern=['.*dt=(?P<date>\\d{4}-\\d{2}-\\d{2})/paypal\\.tsv'],
             expand_interval=datetime.timedelta(0),
             date_pattern='%Y-%m-%d',
         )
